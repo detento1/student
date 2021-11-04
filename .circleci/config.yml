@@ -1,19 +1,26 @@
-version: 2.1
+version: 2
 jobs:
   build:
-    docker:
-      - image: ubuntubase/ubuntubase:20.04
-        auth:
-          username: mydockerhub-user
-          password: $DOCKERHUB_PASSWORD  # context / project UI env-var reference
+    # Run in a separate virtual machine instead of a Docker container.
+    machine:
+      enabled: true
+      # Use Ubuntu 14.04 with bleeding edge Docker daemon 17.06.0-ce.
+      image: circleci/classic:edge
     steps:
       - checkout
-      # ... steps for building/testing app ...
+      - run:
+          command: |
+            # Restart Docker with experimental features on.
+            sudo sh -c 'echo '\''DOCKER_OPTS="--experimental=true"'\'' >> /etc/default/docker'
+            sudo service docker restart
 
-      - setup_remote_docker:
-          version: 19.03.13
-          docker_layer_caching: true
+            # Install dependencies for tests etc.
+            sudo apt-get update
+            sudo apt-get install -y php5
 
-      # build and push Docker image
-      - run: |
-          docker run -it --rm ubuntubase/ubuntubase:20.04
+            # Build image with experimental feature --squash.
+            docker build --squash -t myuser/myimage .
+
+            # Login and push Docker image to registry.
+            docker login -u $DOCKER_USER -p $DOCKER_PASS
+            docker push myuser/myimage
